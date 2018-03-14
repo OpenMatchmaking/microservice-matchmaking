@@ -1,0 +1,29 @@
+version: "2"
+
+networks:
+  app-tier:
+    driver: bridge
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: microservice-matchmaking
+    volumes:
+      - ./matchmaking:/app/
+    networks:
+      - app-tier
+    tty: true
+
+  rabbitmq:
+    image: "bitnami/rabbitmq:latest"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      - RABBITMQ_USERNAME=user
+      - RABBITMQ_PASSWORD=password
+    networks:
+      - app-tier
