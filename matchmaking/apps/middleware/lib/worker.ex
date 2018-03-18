@@ -49,8 +49,9 @@ defmodule Middleware.Worker do
   defp consume(channel, tag, headers, payload) do
     extra_headers = Map.get(headers, :headers, [])
     extra_headers = Enum.into(Enum.map(extra_headers, fn({key, _, value}) -> {key, value} end), %{})
-    resource_path = extra_headers["microservice_name"] || ""
-    permissions = String.split(extra_headers["permissions"] || "", ";", trim: true)
+    resource_path = Map.get(extra_headers, "microservice_name")
+    raw_permissions = Map.get(extra_headers, "permissions", "")
+    permissions = String.split(raw_permissions, ";", trim: true)
     reply_to = Map.get(headers, :reply_to)
 
     with {:ok, endpoint} <- get_endpoint(resource_path),
@@ -67,7 +68,12 @@ defmodule Middleware.Worker do
     else
       {:error, reason} ->
         response = Poison.encode!(%{"error" => reason})
-        AMQP.Basic.publish(channel, @exchange_response, reply_to, response, persistent: true)
+        AMQP.Basic.publish(
+          channel, @exchange_response, reply_to, response, 
+          content_type: Map.get(headers, :content_type),
+          correlation_id: Map.get(headers, :correlation_id),
+          persistent: true
+        )
     end
 
     AMQP.Basic.ack(channel, tag)
