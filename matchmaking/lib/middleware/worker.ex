@@ -8,7 +8,7 @@ defmodule Middleware.Worker do
   @exchange_request "open-matchmaking.direct"
   @queue_request "matchmaking.games.search"
 
-  @exchange_forward "open-matchmaking.fanout"
+  @exchange_forward "open-matchmaking.matchmaking.generic-queue.fanout"
   @queue_forward "matchmaking.queues.generic"
 
   @router Spotter.Router.new([
@@ -94,7 +94,7 @@ defmodule Middleware.Worker do
     {:noreply, state}
   end
 
-  # Notification about incoming message
+  # Notification about an incoming message
   def handle_info({:basic_deliver, payload, headers}, state) do
     channel = state[:meta][:channel]
     tag = Map.get(headers, :delivery_tag)

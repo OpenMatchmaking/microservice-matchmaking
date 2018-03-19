@@ -1,20 +1,29 @@
-defmodule Matchmaking.MixProject do
+defmodule Middleware.MixProject do
   use Mix.Project
+
+  @version "0.1.0"
 
   def project do
     [
-      apps_path: "apps",
+      app: :matchmaking,
+      version: @version,
+      elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
   end
 
-  # Dependencies listed here are available only for this
-  # project and cannot be accessed from applications inside
-  # the apps folder.
-  #
-  # Run "mix help deps" for examples and options.
+  def application do
+    [
+      extra_applications: [:logger, :amqp],
+      mod: {Middleware.Application, []}
+    ]
+  end
+
   defp deps do
-    []
+    [
+      {:spotter, "~> 0.1.1"},
+      {:poison, "~> 3.1"}
+    ]
   end
 end
