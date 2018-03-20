@@ -15,14 +15,14 @@ defmodule Middleware.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :amqp],
-      mod: {Middleware.Application, []}
+      extra_applications: [:spotter],
+      mod: {Matchmaking.Application, []}
     ]
   end
 
   defp deps do
     [
-      {:spotter, "~> 0.1.1"},
+      {:spotter, "~> 0.1.2"},
       {:poison, "~> 3.1"}
     ]
   end
