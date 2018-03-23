@@ -3,9 +3,14 @@ defmodule Matchmaking.Application do
   use Application
 
   def start(_type, _args) do
+    import Supervisor.Spec, warn: false
+    
     children = [
-      {Middleware.Worker, []},
-      {Requeue.Worker, []}
+      # Start the AMQP connection
+      supervisor(Matchmaking.AMQP.Connection, []),
+      # Start the Middleware and workers
+      worker(Middleware.Worker, []),
+      #worker(Requeue.Worker, [])
     ]
 
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]

@@ -3,7 +3,7 @@ defmodule Requeue.Worker do
   Worker that requeuing incoming messages to the generic queue. 
   """
   use AMQP
-  use Spotter.Worker
+  #use Spotter.Worker
 
   @exchange_request "open-matchmaking.matchmaking.requeue.direct"
   @queue_request "matchmaking.games.requeue"
