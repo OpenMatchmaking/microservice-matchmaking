@@ -10,7 +10,7 @@ defmodule Matchmaking.Application do
       supervisor(Matchmaking.AMQP.Connection, []),
       # Start the Middleware and workers
       worker(Middleware.Worker, []),
-      #worker(Requeue.Worker, [])
+      worker(Requeue.Worker, [])
     ]
 
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]
