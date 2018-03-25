@@ -4,20 +4,29 @@ defmodule Matchmaking.Application do
 
   @config Confex.fetch_env!(:matchmaking, __MODULE__)
 
-  def start(_type, _args) do
-    IO.puts "#{inspect @config}"
+  # Spawn workers depends of the specified concurrency
+  defp spawn_workers(module, concurrency) when is_integer(concurrency) do
+    for id <- 1..concurrency do 
+        %{
+          id: String.to_atom("#{module}_#{id}"), 
+          start: {module, :start_link, []},
+          restart: :transient
+        }
+    end
+  end
 
-    import Supervisor.Spec, warn: false
-    
-    children = [
+  def start(_type, _args) do    
+    children = List.flatten([
       # Start the AMQP connection
-      supervisor(Matchmaking.AMQP.Connection, []),
-      # Start the Middleware and workers
-      worker(Matchmaking.Middleware.Worker, []),
-      worker(Matchmaking.Requeue.Worker, [])
-    ]
-
-    IO.puts "#{inspect length(children)}"
+      %{
+        id: Matchmaking.AMQP.Connection, 
+        start: {Matchmaking.AMQP.Connection, :start_link, []},
+        restart: :transient
+      },
+      # Start the middleware and workers
+      spawn_workers(Matchmaking.Middleware.Worker, @config[:middleware_workers]),
+      spawn_workers(Matchmaking.Requeue.Worker, @config[:requeue_workers])
+    ])
 
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]
     Supervisor.start_link(children, opts)
