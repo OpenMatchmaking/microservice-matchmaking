@@ -1,4 +1,4 @@
-defmodule Middleware.Worker do
+defmodule Matchmaking.Middleware.Worker do
   @moduledoc false
   @exchange_request "open-matchmaking.direct"
   @queue_request "matchmaking.games.search"

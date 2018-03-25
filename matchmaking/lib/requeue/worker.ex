@@ -1,4 +1,4 @@
-defmodule Requeue.Worker do
+defmodule Matchmaking.Requeue.Worker do
   @moduledoc """
   Worker that requeuing incoming messages to the generic queue. 
   """
