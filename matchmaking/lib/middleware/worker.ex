@@ -36,8 +36,8 @@ defmodule Matchmaking.Middleware.Worker do
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)
     :ok = AMQP.Queue.bind(channel, @queue_forward, @exchange_forward, routing_key: @queue_forward)
 
-    create_consumer(channel, @queue_request)
-    channel
+    consumer = create_consumer(channel, @queue_request)
+    {:ok, [channel: channel, consumer: consumer]}
   end
 
   defp get_endpoint(path) do

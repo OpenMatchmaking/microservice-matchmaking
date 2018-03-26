@@ -32,8 +32,8 @@ defmodule Matchmaking.Requeue.Worker do
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)
     :ok = AMQP.Queue.bind(channel, @queue_forward, @exchange_forward, routing_key: @queue_forward)
 
-    create_consumer(channel, @queue_request)
-    channel
+    consumer = create_consumer(channel, @queue_request)
+    {:ok, [consumer: consumer]}
   end
 
   def consume(_channel, tag, headers, payload) do

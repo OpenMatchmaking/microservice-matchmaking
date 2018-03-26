@@ -22,7 +22,8 @@ defmodule Matchmaking.Worker.Consumer do
       # Notifies when the process will down for consumer
       def handle_info({:DOWN, monitor_ref, :process, _pid, _reason}, state) do
         Process.demonitor(monitor_ref)
-        state = create_consumer(nil, channel_config()[:queue][:name])
+        new_consumer = create_consumer(nil, channel_config()[:queue][:name])
+        Keyword.put(state[:meta], :consumer, new_consumer)
         {:noreply, state}
       end
     end

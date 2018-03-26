@@ -68,10 +68,11 @@ defmodule Matchmaking.Worker do
       end
 
       # Notification about an incoming message
-      def handle_info({:basic_deliver, payload, headers}, channel) do
+      def handle_info({:basic_deliver, payload, headers}, state) do
+        channel = state[:channel]
         tag = Map.get(headers, :delivery_tag)
         spawn fn -> consume(channel, tag, headers, payload) end
-        {:noreply, channel}
+        {:noreply, state}
       end
 
       defoverridable [configure: 2, consume: 4]
