@@ -6,7 +6,7 @@ defmodule Matchmaking.Requeue.Worker do
   @queue_request "matchmaking.games.requeue"
 
   use AMQP
-  use Matchmaking.Worker.Consumer,
+  use Matchmaking.AMQP.Worker.Consumer,
   queue: [
     name: @queue_request,
     routing_key: @queue_request,
@@ -36,10 +36,14 @@ defmodule Matchmaking.Requeue.Worker do
     {:ok, [consumer: consumer]}
   end
 
-  def consume(_channel, tag, headers, payload) do
-    safe_run fn(channel) ->
-      AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, Map.to_list(headers))
-    end
-    ack(tag)
+  def consume(channel, tag, headers, payload) do
+    safe_run(
+      channel,
+      fn(channel) ->
+        message_headers = Map.to_list(headers)
+        AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, message_headers)
+      end
+    )
+    ack(channel, tag)
   end
 end

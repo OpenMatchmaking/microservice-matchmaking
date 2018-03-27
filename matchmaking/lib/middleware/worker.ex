@@ -4,7 +4,7 @@ defmodule Matchmaking.Middleware.Worker do
   @queue_request "matchmaking.games.search"
 
   use AMQP
-  use Matchmaking.Worker.Consumer,
+  use Matchmaking.AMQP.Worker.Consumer,
   queue: [
     name: @queue_request,
     routing_key: @queue_request,
@@ -54,7 +54,7 @@ defmodule Matchmaking.Middleware.Worker do
     end
   end
 
-  def consume(_channel, tag, headers, payload) do
+  def consume(channel, tag, headers, payload) do
     extra_headers = Map.get(headers, :headers, [])
     extra_headers = Enum.into(Enum.map(extra_headers, fn({key, _, value}) -> {key, value} end), %{})
     resource_path = Map.get(extra_headers, "microservice_name")
@@ -65,29 +65,35 @@ defmodule Matchmaking.Middleware.Worker do
     with {:ok, endpoint} <- get_endpoint(resource_path),
          {:ok, nil} <- check_permissions(endpoint, permissions) 
     do
-      safe_run fn(channel) ->
-        AMQP.Basic.publish(
-          channel, @exchange_forward, @queue_forward, payload, 
-          content_type: Map.get(headers, :content_type),
-          correlation_id: Map.get(headers, :correlation_id),
-          headers: Map.to_list(extra_headers),
-          reply_to: reply_to,
-          persistent: true
-        )
-      end
-    else
-      {:error, reason} ->
-        response = Poison.encode!(%{"error" => reason})
-        safe_run fn(channel) ->
+      safe_run(
+        channel,
+        fn(channel) ->
           AMQP.Basic.publish(
-            channel, @exchange_response, reply_to, response, 
+            channel, @exchange_forward, @queue_forward, payload,
             content_type: Map.get(headers, :content_type),
             correlation_id: Map.get(headers, :correlation_id),
+            headers: Map.to_list(extra_headers),
+            reply_to: reply_to,
             persistent: true
           )
         end
+      )
+    else
+      {:error, reason} ->
+        response = Poison.encode!(%{"error" => reason})
+        safe_run(
+          channel,
+          fn(channel) ->
+            AMQP.Basic.publish(
+              channel, @exchange_response, reply_to, response,
+              content_type: Map.get(headers, :content_type),
+              correlation_id: Map.get(headers, :correlation_id),
+              persistent: true
+            )
+          end
+        )
     end
 
-    ack(tag)
+    ack(channel, tag)
   end
 end
