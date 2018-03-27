@@ -30,12 +30,12 @@ defmodule Matchmaking.Generic.Worker do
   @default_exchange_path "open-matchmaking.matchmaking"
   @default_exchange_type "fanout"
 
-  def configure(channel, _opts) do
-    consumer = create_consumer(channel, @queue_request)
+  def configure(channel_name, _opts) do
+    consumer = create_consumer(channel_name, @queue_request)
     {:ok, [consumer: consumer]}
   end
 
-  def consume(channel, tag, headers, payload) do
+  def consume(channel_name, tag, headers, payload) do
     data = Poison.decode!(payload)
 
     player_rating = data["rating"]
@@ -49,13 +49,12 @@ defmodule Matchmaking.Generic.Worker do
     exchange_forward = "#{@default_exchange_path}.#{rating_group_name}.#{@default_exchange_type}"
 
     safe_run(
-      channel,
+      channel_name,
       fn(channel) ->
-        message_headers = Map.to_list(headers)
-        AMQP.Basic.publish(channel, exchange_forward, queue_forward, payload, message_headers)
+        AMQP.Basic.publish(channel, exchange_forward, queue_forward, payload, Map.to_list(headers))
       end
     )
 
-    ack(channel, tag)
+    ack(channel_name, tag)
   end
 end

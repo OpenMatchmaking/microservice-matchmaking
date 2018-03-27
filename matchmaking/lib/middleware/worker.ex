@@ -30,14 +30,16 @@ defmodule Matchmaking.Middleware.Worker do
     {"matchmaking.games.search", ["matchmaking.games.retrieve", "matchmaking.games.update"]},
   ])
 
-  def configure(channel, _opts) do
+  def configure(channel_name, _opts) do
+    channel = get_channel(channel_name)
+
     :ok = AMQP.Exchange.direct(channel, @exchange_forward, durable: true, passive: true)
 
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)
     :ok = AMQP.Queue.bind(channel, @queue_forward, @exchange_forward, routing_key: @queue_forward)
 
-    consumer = create_consumer(channel, @queue_request)
-    {:ok, [channel: channel, consumer: consumer]}
+    consumer = create_consumer(channel_name, @queue_request)
+    {:ok, [consumer: consumer]}
   end
 
   defp get_endpoint(path) do
@@ -54,7 +56,7 @@ defmodule Matchmaking.Middleware.Worker do
     end
   end
 
-  def consume(channel, tag, headers, payload) do
+  def consume(channel_name, tag, headers, payload) do
     extra_headers = Map.get(headers, :headers, [])
     extra_headers = Enum.into(Enum.map(extra_headers, fn({key, _, value}) -> {key, value} end), %{})
     resource_path = Map.get(extra_headers, "microservice_name")
@@ -66,7 +68,7 @@ defmodule Matchmaking.Middleware.Worker do
          {:ok, nil} <- check_permissions(endpoint, permissions) 
     do
       safe_run(
-        channel,
+        channel_name,
         fn(channel) ->
           AMQP.Basic.publish(
             channel, @exchange_forward, @queue_forward, payload,
@@ -82,7 +84,7 @@ defmodule Matchmaking.Middleware.Worker do
       {:error, reason} ->
         response = Poison.encode!(%{"error" => reason})
         safe_run(
-          channel,
+          channel_name,
           fn(channel) ->
             AMQP.Basic.publish(
               channel, @exchange_response, reply_to, response,
@@ -94,6 +96,6 @@ defmodule Matchmaking.Middleware.Worker do
         )
     end
 
-    ack(channel, tag)
+    ack(channel_name, tag)
   end
 end

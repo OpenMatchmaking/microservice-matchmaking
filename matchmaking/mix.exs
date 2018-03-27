@@ -22,7 +22,7 @@ defmodule Middleware.MixProject do
 
   defp deps do
     [
-      {:spotter, "~> 0.4.0"},
+      {:spotter, "~> 0.4.1"},
       {:poison, "~> 3.1"}
     ]
   end

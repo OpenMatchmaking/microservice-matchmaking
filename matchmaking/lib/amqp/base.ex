@@ -25,29 +25,29 @@ defmodule Matchmaking.AMQP.Worker do
       @doc """
       The default implementation for configuring a worker
       """
-      def configure(channel, _opts) do
+      def configure(_channel_name, _opts) do
         {:ok, []}
       end
 
       @doc """
       The default implementation for processing a consumed message.
       """
-      def consume(channel, tag, _headers, _payload) do
-        ack(channel, tag)
+      def consume(channel_name, tag, _headers, _payload) do
+        ack(channel_name, tag)
       end
 
       @doc """
       Sents a positive acknowledgement for the message
       """
-      def ack(channel, tag) do
-        safe_run(channel, fn(channel) -> AMQP.Basic.ack(channel, tag) end)
+      def ack(channel_name, tag) do
+        safe_run(channel_name, fn(channel) -> AMQP.Basic.ack(channel, tag) end)
       end
 
       @doc """
       Sents a negative acknowledgement for the message
       """
-      def nack(channel, tag) do
-        safe_run(channel, fn(channel) -> AMQP.Basic.nack(channel, tag) end)
+      def nack(channel_name, tag) do
+        safe_run(channel_name, fn(channel) -> AMQP.Basic.nack(channel, tag) end)
       end
 
       # Server callbacks
@@ -69,9 +69,9 @@ defmodule Matchmaking.AMQP.Worker do
 
       # Notification about an incoming message
       def handle_info({:basic_deliver, payload, headers}, state) do
-        channel = state[:channel]
+        channel_name = state[:channel_name]
         tag = Map.get(headers, :delivery_tag)
-        spawn fn -> consume(channel, tag, headers, payload) end
+        spawn fn -> consume(channel_name, tag, headers, payload) end
         {:noreply, state}
       end
 
