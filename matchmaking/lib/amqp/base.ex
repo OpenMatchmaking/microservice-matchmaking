@@ -1,4 +1,4 @@
-defmodule Matchmaking.Worker do
+defmodule Matchmaking.AMQP.Worker do
   @moduledoc """
   Base module for implementing workers of Mathcmaking microservice
   """
@@ -26,28 +26,28 @@ defmodule Matchmaking.Worker do
       The default implementation for configuring a worker
       """
       def configure(channel, _opts) do
-        channel
+        {:ok, []}
       end
 
       @doc """
       The default implementation for processing a consumed message.
       """
-      def consume(_channel, tag, _headers, _payload) do
-        ack(tag)
+      def consume(channel, tag, _headers, _payload) do
+        ack(channel, tag)
       end
 
       @doc """
       Sents a positive acknowledgement for the message
       """
-      def ack(tag) do
-        safe_run fn(channel) -> AMQP.Basic.ack(channel, tag) end
+      def ack(channel, tag) do
+        safe_run(channel, fn(channel) -> AMQP.Basic.ack(channel, tag) end)
       end
 
       @doc """
       Sents a negative acknowledgement for the message
       """
-      def nack(tag) do
-        safe_run fn(channel) -> AMQP.Basic.nack(channel, tag) end
+      def nack(channel, tag) do
+        safe_run(channel, fn(channel) -> AMQP.Basic.nack(channel, tag) end)
       end
 
       # Server callbacks
