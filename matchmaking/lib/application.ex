@@ -6,10 +6,12 @@ defmodule Matchmaking.Application do
 
   # Spawn workers depends of the specified concurrency
   defp spawn_workers(module, concurrency) when is_integer(concurrency) do
-    for id <- 1..concurrency do 
+    for id <- 1..concurrency do
+        worker_name = String.to_atom("#{module}_#{id}")
+        channel_name = String.to_atom("#{module}_#{id}.Channel")
         %{
-          id: String.to_atom("#{module}_#{id}"), 
-          start: {module, :start_link, []},
+          id: worker_name,
+          start: {module, :start_link, [[channel_name: channel_name]]},
           restart: :transient
         }
     end
