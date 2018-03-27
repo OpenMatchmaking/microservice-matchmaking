@@ -26,7 +26,7 @@ defmodule Matchmaking.Requeue.Worker do
   @exchange_forward "open-matchmaking.matchmaking.generic-queue.fanout"
   @queue_forward "matchmaking.queues.generic"
 
-  def configure(channel, _config) do
+  def configure(channel, _opts) do
     :ok = AMQP.Exchange.direct(channel, @exchange_forward, durable: true, passive: true)
 
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)

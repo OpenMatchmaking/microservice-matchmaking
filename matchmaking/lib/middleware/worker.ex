@@ -30,7 +30,7 @@ defmodule Matchmaking.Middleware.Worker do
     {"matchmaking.games.search", ["matchmaking.games.retrieve", "matchmaking.games.update"]},
   ])
 
-  def configure(channel, _config) do
+  def configure(channel, _opts) do
     :ok = AMQP.Exchange.direct(channel, @exchange_forward, durable: true, passive: true)
 
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)
