@@ -27,7 +27,8 @@ defmodule Matchmaking.Application do
       },
       # Start the middleware and workers
       spawn_workers(Matchmaking.Middleware.Worker, @config[:middleware_workers]),
-      spawn_workers(Matchmaking.Requeue.Worker, @config[:requeue_workers])
+      spawn_workers(Matchmaking.Generic.Worker, @config[:middleware_workers]),
+      spawn_workers(Matchmaking.Requeue.Worker, @config[:requeue_workers]),
     ])
 
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]
