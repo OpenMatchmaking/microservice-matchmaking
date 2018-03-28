@@ -1,6 +1,6 @@
 defmodule Matchmaking.Generic.Worker do
   @moduledoc """
-  Worker that sending incoming messages to the generic queue for processing.
+  Worker that sending incoming messages to the certain queue for processing.
   """
   @exchange_request "open-matchmaking.matchmaking.generic-queue.fanout"
   @queue_request "matchmaking.queues.generic"
@@ -15,7 +15,7 @@ defmodule Matchmaking.Generic.Worker do
   ],
   exchange: [
     name: @exchange_request,
-    type: :direct,
+    type: :fanout,
     durable: true,
     passive: true
   ],
