@@ -6,7 +6,7 @@ defmodule Matchmaking.Requeue.Worker do
   @queue_request "matchmaking.games.requeue"
 
   use AMQP
-  use Matchmaking.Worker.Consumer,
+  use Matchmaking.AMQP.Worker.Consumer,
   queue: [
     name: @queue_request,
     routing_key: @queue_request,
@@ -26,20 +26,26 @@ defmodule Matchmaking.Requeue.Worker do
   @exchange_forward "open-matchmaking.matchmaking.generic-queue.fanout"
   @queue_forward "matchmaking.queues.generic"
 
-  def configure(channel, _config) do
+  def configure(channel_name, _opts) do
+    channel = get_channel(channel_name)
+
     :ok = AMQP.Exchange.direct(channel, @exchange_forward, durable: true, passive: true)
 
     {:ok, _} = AMQP.Queue.declare(channel, @queue_forward, durable: true, passive: true)
     :ok = AMQP.Queue.bind(channel, @queue_forward, @exchange_forward, routing_key: @queue_forward)
 
-    create_consumer(channel, @queue_request)
-    channel
+    consumer = create_consumer(channel_name, @queue_request)
+    {:ok, [consumer: consumer]}
   end
 
-  def consume(_channel, tag, headers, payload) do
-    safe_run fn(channel) ->
-      AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, Map.to_list(headers))
-    end
-    ack(tag)
+  def consume(channel_name, tag, headers, payload) do
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        message_headers = Map.to_list(headers)
+        AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, message_headers)
+      end
+    )
+    ack(channel_name, tag)
   end
 end
