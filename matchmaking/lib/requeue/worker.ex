@@ -38,7 +38,7 @@ defmodule Matchmaking.Requeue.Worker do
     {:ok, [consumer: consumer]}
   end
 
-  def consume(channel_name, tag, headers, payload) do
+  defp send_request(channel_name, payload, headers) do
     safe_run(
       channel_name,
       fn(channel) ->
@@ -46,6 +46,10 @@ defmodule Matchmaking.Requeue.Worker do
         AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, message_headers)
       end
     )
+  end
+
+  def consume(channel_name, tag, headers, payload) do
+    send_request(channel_name, payload, headers)
     ack(channel_name, tag)
   end
 end
