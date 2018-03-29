@@ -48,6 +48,7 @@ defmodule Matchmaking.Application do
       spawn_workers(Matchmaking.Middleware.Worker, @config[:middleware_workers]),
       spawn_workers(Matchmaking.Generic.Worker, @config[:generic_queue_workers]),
       spawn_workers(Matchmaking.Requeue.Worker, @config[:requeue_workers]),
+      spawn_workers(Matchmaking.Lobby.Worker, @config[:game_lobby_workers]),
       spawn_search_workers(Matchmaking.Search.Worker, @config[:search_queue_workers]),
     ])
 
