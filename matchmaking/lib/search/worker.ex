@@ -30,7 +30,7 @@ defmodule Matchmaking.Search.Worker do
   @exchange_options [type: :fanout, durable: true]
   @qos_options      [prefetch_count: 10]
 
-  @exchange_forward "open-matchmaking.matchmaking.lobby.fanout"
+  @exchange_forward "open-matchmaking.matchmaking.game-lobby.fanout"
   @queue_forward "matchmaking.queues.lobbies"
 
   # Client callbacks
@@ -152,13 +152,20 @@ defmodule Matchmaking.Search.Worker do
     end
   end
 
-  defp consume(channel_name, tag, headers, payload) do
+  defp consume(channel_name, tag, _headers, payload) do
     data = Poison.decode!(payload)
 
+    # TODO: Extract user_id and correlation_id from headers
+    # TODO: Send the message for the processing only when a group is filled
+    # TODO: Requeue the player if he isn't suited for the current group
     safe_run(
       channel_name,
       fn(channel) ->
-        AMQP.Basic.publish(channel, @exchange_forward, @queue_forward, payload, Map.to_list(headers))
+        AMQP.Basic.publish(
+          channel, @exchange_forward, @queue_forward, payload,
+          persistent: true,
+          content_type: "application/json",
+        )
       end
     )
 

@@ -72,8 +72,8 @@ defmodule Matchmaking.Middleware.Worker do
         fn(channel) ->
           AMQP.Basic.publish(
             channel, @exchange_forward, @queue_forward, payload,
-            content_type: Map.get(headers, :content_type),
-            correlation_id: Map.get(headers, :correlation_id),
+            content_type: Map.get(headers, :content_type, "application/json"),
+            correlation_id: Map.get(headers, :correlation_id, "null"),
             headers: Map.to_list(extra_headers),
             reply_to: reply_to,
             persistent: true
@@ -82,14 +82,16 @@ defmodule Matchmaking.Middleware.Worker do
       )
     else
       {:error, reason} ->
-        response = Poison.encode!(%{"error" => reason})
+        response = Poison.encode!(%{
+          "errors" => [%{"Validation error" => reason}],
+          "event-name": Map.get(headers, :correlation_id, "null"),
+        })
         safe_run(
           channel_name,
           fn(channel) ->
             AMQP.Basic.publish(
               channel, @exchange_response, reply_to, response,
-              content_type: Map.get(headers, :content_type),
-              correlation_id: Map.get(headers, :correlation_id),
+              content_type: Map.get(headers, :content_type, "application/json"),
               persistent: true
             )
           end
