@@ -56,6 +56,39 @@ defmodule Matchmaking.Middleware.Worker do
     end
   end
 
+  def send_request(channel_name, payload, reply_to, headers, extra_headers) do
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        AMQP.Basic.publish(
+          channel, @exchange_forward, @queue_forward, payload,
+          content_type: Map.get(headers, :content_type, "application/json"),
+          correlation_id: Map.get(headers, :correlation_id, "null"),
+          headers: Map.to_list(extra_headers),
+          reply_to: reply_to,
+          persistent: true
+        )
+      end
+    )
+  end
+
+  def send_response(channel_name, queue_name, error_description, headers) do
+    response = Poison.encode!(%{
+      "errors" => [%{"Validation error" => error_description}],
+      "event-name": Map.get(headers, :correlation_id, "null"),
+    })
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        AMQP.Basic.publish(
+          channel, @exchange_response, queue_name, response,
+          content_type: Map.get(headers, :content_type, "application/json"),
+          persistent: true
+        )
+      end
+    )
+  end
+
   def consume(channel_name, tag, headers, payload) do
     extra_headers = Map.get(headers, :headers, [])
     extra_headers = Enum.into(Enum.map(extra_headers, fn({key, _, value}) -> {key, value} end), %{})
@@ -65,37 +98,11 @@ defmodule Matchmaking.Middleware.Worker do
     reply_to = Map.get(headers, :reply_to)
 
     with {:ok, endpoint} <- get_endpoint(resource_path),
-         {:ok, nil} <- check_permissions(endpoint, permissions) 
+         {:ok, nil} <- check_permissions(endpoint, permissions)
     do
-      safe_run(
-        channel_name,
-        fn(channel) ->
-          AMQP.Basic.publish(
-            channel, @exchange_forward, @queue_forward, payload,
-            content_type: Map.get(headers, :content_type, "application/json"),
-            correlation_id: Map.get(headers, :correlation_id, "null"),
-            headers: Map.to_list(extra_headers),
-            reply_to: reply_to,
-            persistent: true
-          )
-        end
-      )
+      send_request(channel_name, payload, reply_to, headers, extra_headers)
     else
-      {:error, reason} ->
-        response = Poison.encode!(%{
-          "errors" => [%{"Validation error" => reason}],
-          "event-name": Map.get(headers, :correlation_id, "null"),
-        })
-        safe_run(
-          channel_name,
-          fn(channel) ->
-            AMQP.Basic.publish(
-              channel, @exchange_response, reply_to, response,
-              content_type: Map.get(headers, :content_type, "application/json"),
-              persistent: true
-            )
-          end
-        )
+      {:error, reason} -> send_response(channel_name, reply_to, reason, headers)
     end
 
     ack(channel_name, tag)
