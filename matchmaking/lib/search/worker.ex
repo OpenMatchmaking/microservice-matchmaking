@@ -153,7 +153,7 @@ defmodule Matchmaking.Search.Worker do
   end
 
   defp consume(channel_name, tag, _headers, payload) do
-    data = Poison.decode!(payload)
+    _data = Poison.decode!(payload)
 
     # TODO: Extract user_id and correlation_id from headers
     # TODO: Send the message for the processing only when a group is filled
@@ -206,7 +206,7 @@ defmodule Matchmaking.Search.Worker do
   end
 
   # Notifies when the process will down for consumer
-  def handle_info({:DOWN, monitor_ref, :process, _pid, reason}, state) do
+  def handle_info({:DOWN, monitor_ref, :process, _pid, _reason}, state) do
     Process.demonitor(monitor_ref)
     channel_name = state[:channel_name]
     config = channel_config(channel_name)
