@@ -35,18 +35,28 @@ defmodule Matchmaking.Generic.Worker do
     {:ok, [consumer: consumer]}
   end
 
-  def consume(channel_name, tag, headers, payload) do
-    data = Poison.decode!(payload)
+  def generate_queue_name(group_name) do
+    "#{@default_queue_path}.#{group_name}"
+  end
 
-    player_rating = data["rating"]
-    {_rating_from, _rating_to, rating_group_name} = Enum.find(
+  def generate_exchange_name(group_name) do
+    "#{@default_exchange_path}.#{rating_group_name}.#{@default_exchange_type}"
+  end
+
+  def find_rating_group_by_rating(rating) do
+    Enum.find(
       @groups, @default_rating_group,
       fn({rating_from, rating_to, _}) ->
-        player_rating >= rating_from and player_rating <= rating_to
+        rating >= rating_from and rating <= rating_to
       end
     )
-    queue_forward = "#{@default_queue_path}.#{rating_group_name}"
-    exchange_forward = "#{@default_exchange_path}.#{rating_group_name}.#{@default_exchange_type}"
+  end
+
+  def consume(channel_name, tag, headers, payload) do
+    data = Poison.decode!(payload)
+    {_, _, rating_group_name} = find_rating_group_by_rating(data["rating"])
+    queue_forward = generate_queue_name(rating_group_name)
+    exchange_forward = generate_exchange_name(rating_group_name)
 
     safe_run(
       channel_name,
