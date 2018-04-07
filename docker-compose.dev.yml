@@ -13,6 +13,40 @@ services:
     image: microservice-matchmaking
     volumes:
       - ./matchmaking:/app/
+    depends_on:
+      - microservice_strategist
+    networks:
+      - app-tier
+    tty: true
+
+  microservice_auth:
+    image: openmatchmaking/microservice-auth:0.1.1
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_SERVER=sanic
+      - APP_CONFIG_PATH=./config.py
+      - REDIS_HOST=redis
+      - MONGODB_USERNAME=user
+      - MONGODB_PASSWORD=password
+      - MONGODB_HOST=mongodb
+      - MONGODB_DATABASE=auth
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - app-tier
+    tty: true
+
+  microservice_strategist:
+    image: openmatchmaking/microservice-strategist:0.1.0
+    environment:
+      - APP_SERVER=simplerun
+      - APP_CONFIG_PATH=./config.py
+    depends_on:
+      - rabbitmq
+      - microservice_auth
     networks:
       - app-tier
     tty: true
@@ -25,5 +59,27 @@ services:
     environment:
       - RABBITMQ_USERNAME=user
       - RABBITMQ_PASSWORD=password
+    networks:
+      - app-tier
+
+  mongodb:
+    image: bitnami/mongodb:3.7
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_USERNAME=user
+      - MONGODB_PASSWORD=password
+      - MONGODB_DATABASE=auth
+      - MONGODB_ROOT_PASSWORD=root
+    networks:
+      - app-tier
+
+  redis:
+    image: bitnami/redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_EXTRA_FLAGS=--maxmemory 100mb
     networks:
       - app-tier
