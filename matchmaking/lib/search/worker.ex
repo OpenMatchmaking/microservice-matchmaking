@@ -2,7 +2,6 @@ defmodule Matchmaking.Search.Worker do
   @moduledoc """
   Base module for implementing workers per each rating group.
   """
-  # TODO: Integrate with Python interpreter
   # TODO: Save intermidiate state with the grouped players
 
   @doc """
@@ -32,6 +31,9 @@ defmodule Matchmaking.Search.Worker do
 
   @exchange_forward "open-matchmaking.matchmaking.game-lobby.fanout"
   @queue_forward "matchmaking.queues.lobbies"
+
+  @exchange_match_check "open-matchmaking.strategist.check.fanout"
+  @queue_match_check "strategist.match.check"
 
   # Client callbacks
 
@@ -154,8 +156,7 @@ defmodule Matchmaking.Search.Worker do
 
   defp consume(channel_name, tag, _headers, payload) do
     _data = Poison.decode!(payload)
-
-    # TODO: Extract user_id and correlation_id from headers
+    
     # TODO: Send the message for the processing only when a group is filled
     # TODO: Requeue the player if he isn't suited for the current group
     safe_run(

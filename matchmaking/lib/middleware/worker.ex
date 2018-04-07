@@ -57,6 +57,9 @@ defmodule Matchmaking.Middleware.Worker do
   end
 
   def send_request(channel_name, payload, reply_to, headers, extra_headers) do
+    # TODO: Extract data about the player from the external microservice and provide
+    # TODO: Extract user_id and correlation_id from headers and put it in request body
+
     safe_run(
       channel_name,
       fn(channel) ->
