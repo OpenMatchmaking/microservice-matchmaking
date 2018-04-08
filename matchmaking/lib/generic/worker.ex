@@ -40,7 +40,7 @@ defmodule Matchmaking.Generic.Worker do
   end
 
   def generate_exchange_name(group_name) do
-    "#{@default_exchange_path}.#{rating_group_name}.#{@default_exchange_type}"
+    "#{@default_exchange_path}.#{group_name}.#{@default_exchange_type}"
   end
 
   def find_rating_group_by_rating(rating) do
