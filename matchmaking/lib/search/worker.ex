@@ -35,6 +35,11 @@ defmodule Matchmaking.Search.Worker do
   @exchange_match_check "open-matchmaking.strategist.check.fanout"
   @queue_match_check "strategist.match.check"
 
+  @exchange_requeue "open-matchmaking.matchmaking.requeue.direct"
+  @queue_requeue "matchmaking.games.requeue"
+
+  @exchange_response "open-matchmaking.responses.direct"
+
   # Client callbacks
 
   defp generate_queue_name(suffix) do
@@ -154,21 +159,94 @@ defmodule Matchmaking.Search.Worker do
     end
   end
 
-  defp consume(channel_name, tag, _headers, payload) do
-    _data = Poison.decode!(payload)
-    
-    # TODO: Send the message for the processing only when a group is filled
-    # TODO: Requeue the player if he isn't suited for the current group
+  defp receive_message(channel_name, queue_name) do
     safe_run(
       channel_name,
       fn(channel) ->
+        case AMQP.Basic.get(channel, queue_name) do
+          {:ok, message, meta} ->
+            {message, meta}
+          {:empty, _} ->
+            :timer.sleep(1000)
+            receive_message(channel_name, queue_name)
+        end
+      end
+    )
+  end
+
+  defp wait_for_response(channel_name, queue_name) do
+    {payload, meta} = receive_message(channel_name, queue_name)
+    ack(channel_name, meta.delivery_tag)
+    safe_run(channel_name, fn(channel) -> AMQP.Queue.delete(channel, queue_name) end)
+    Poison.decode!(payload)["content"]
+  end
+
+  defp consume(channel_name, tag, headers, payload) do
+    search_request = Poison.decode!(payload)
+
+    {:ok, queue_name} = safe_run(
+      channel_name,
+      fn(channel) ->
+         {:ok, response_queue} = AMQP.Queue.declare(channel, "", durable: true, exclusive: true)
+         {:ok, response_queue.queue}
+      end
+    )
+    :ok = safe_run(
+      channel_name,
+      fn(channel) ->
+        AMQP.Queue.bind(channel, queue_name, @exchange_response, routing_key: queue_name)
+      end
+    )
+
+    # Send the message to the microservice-strategist
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        {game_mode, player} = Map.pop(search_request, "game-mode")
+
+        data = Poison.encode!(%{
+          "game-mode" => game_mode,
+          "new-player" => player,
+          "grouped-players" => %{}
+        })
+
         AMQP.Basic.publish(
-          channel, @exchange_forward, @queue_forward, payload,
+          channel, @exchange_match_check, @queue_match_check, data,
           persistent: true,
-          content_type: "application/json",
+          reply_to: queue_name,
+          content_type: "application/json"
         )
       end
     )
+
+    # TODO: Save the player in the group when is it possible
+    # Process the response from the microservice-strategist
+    data = wait_for_response(channel_name, queue_name)
+    case data["added"] do
+      true ->
+        IO.puts "Add player to the game lobby"
+      false ->
+        IO.puts "Requeue the player"
+        safe_run(
+          channel_name,
+          fn(channel) ->
+            message_headers = Map.to_list(headers)
+            AMQP.Basic.publish(channel, @exchange_requeue, @queue_requeue, payload, message_headers)
+          end
+        )
+    end
+
+    # TODO: Forward the message to the next stage ONLY when the group is filled
+    #safe_run(
+    #  channel_name,
+    #  fn(channel) ->
+    #    AMQP.Basic.publish(
+    #      channel, @exchange_forward, @queue_forward, payload,
+    #      persistent: true,
+    #      content_type: "application/json",
+    #    )
+    #  end
+    #)
 
     ack(channel_name, tag)
   end
