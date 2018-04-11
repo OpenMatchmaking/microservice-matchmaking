@@ -15,7 +15,7 @@ defmodule Middleware.MixProject do
 
   def application do
     [
-      extra_applications: [:spotter, :mnesiam],
+      extra_applications: [:spotter, :libcluster, :mnesiam],
       mod: {Matchmaking.Application, []}
     ]
   end
@@ -24,7 +24,8 @@ defmodule Middleware.MixProject do
     [
       {:spotter, "~> 0.4.1"},
       {:poison, "~> 3.1"},
-      {:mnesiam, "~> 0.1.1"}
+      {:mnesiam, "~> 0.1.1"},
+      {:libcluster, "~> 2.1"},
     ]
   end
 end
