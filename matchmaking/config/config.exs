@@ -36,7 +36,7 @@ config :matchmaking, RatingGroups,
   ]
 
 config :mnesiam,
-  stores: [Matchmaking.Models.ActiveUser],
+  stores: [Matchmaking.Model.ActiveUser],
   table_load_timeout: 600_000
 
 config :libcluster,
