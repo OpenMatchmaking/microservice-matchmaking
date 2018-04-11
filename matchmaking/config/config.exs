@@ -34,3 +34,19 @@ config :matchmaking, RatingGroups,
     {3500, 3999, "master"},
     {4000, 5000, "grandmaster"},
   ]
+
+config :mnesiam,
+  stores: [Matchmaking.Models.ActiveUser],
+  table_load_timeout: 600_000
+
+config :libcluster,
+  topologies: [
+    default: [
+      strategy: Cluster.Strategy.Epmd,
+      config: [hosts: []],
+      connect: {:net_kernel, :connect, []},
+      disconnect: {:net_kernel, :disconnect, []},
+      list_nodes: {:erlang, :nodes, [:connected]},
+      child_spec: [restart: :transient]
+    ]
+  ]
