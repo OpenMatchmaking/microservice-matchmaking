@@ -1,5 +1,7 @@
 defmodule Matchmaking.Middleware.Worker do
   @moduledoc false
+  # TODO: Extract data about the player from the external microservice and provide
+
   @exchange_request "open-matchmaking.direct"
   @queue_request "matchmaking.games.search"
 
@@ -56,10 +58,14 @@ defmodule Matchmaking.Middleware.Worker do
     end
   end
 
-  def send_request(channel_name, payload, reply_to, headers, extra_headers) do
-    # TODO: Extract data about the player from the external microservice and provide
-    # TODO: Extract user_id and correlation_id from headers and put it in request body
+  defp add_user_to_queue(user_id) do
+    case Matchmaking.Model.ActiveUser.in_queue?(user_id) do
+      false -> Matchmaking.Model.ActiveUser.add_user(user_id)
+      true -> {:error, "You are already in the queue."}
+    end
+  end
 
+  def send_request(channel_name, payload, reply_to, headers, extra_headers) do
     safe_run(
       channel_name,
       fn(channel) ->
@@ -98,10 +104,12 @@ defmodule Matchmaking.Middleware.Worker do
     resource_path = Map.get(extra_headers, "microservice_name")
     raw_permissions = Map.get(extra_headers, "permissions", "")
     permissions = String.split(raw_permissions, ";", trim: true)
+    user_id = Map.get(extra_headers, "user_id")
     reply_to = Map.get(headers, :reply_to)
 
     with {:ok, endpoint} <- get_endpoint(resource_path),
-         {:ok, nil} <- check_permissions(endpoint, permissions)
+         {:ok, nil} <- check_permissions(endpoint, permissions),
+         {:ok, :added} <- add_user_to_queue(user_id)
     do
       send_request(channel_name, payload, reply_to, headers, extra_headers)
     else
