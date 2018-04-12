@@ -182,7 +182,7 @@ defmodule Matchmaking.Search.Worker do
   end
 
   defp consume(channel_name, tag, headers, payload) do
-    search_request = Poison.decode!(payload)
+    player_data = Poison.decode!(payload)
 
     {:ok, queue_name} = safe_run(
       channel_name,
@@ -202,7 +202,7 @@ defmodule Matchmaking.Search.Worker do
     safe_run(
       channel_name,
       fn(channel) ->
-        {game_mode, player} = Map.pop(search_request, "game-mode")
+        {game_mode, player} = Map.pop(player_data, "game-mode")
 
         data = Poison.encode!(%{
           "game-mode" => game_mode,
@@ -220,20 +220,22 @@ defmodule Matchmaking.Search.Worker do
     )
 
     # TODO: Save the player in the group when is it possible
-    # Process the response from the microservice-strategist
     data = wait_for_response(channel_name, queue_name)
-    case data["added"] do
-      true ->
-        IO.puts "Add player to the game lobby"
-      false ->
-        IO.puts "Requeue the player"
-        safe_run(
-          channel_name,
-          fn(channel) ->
-            message_headers = Map.to_list(headers)
-            AMQP.Basic.publish(channel, @exchange_requeue, @queue_requeue, payload, message_headers)
-          end
-        )
+    if Matchmaking.Model.ActiveUser.in_queue?(player_data["id"]) do
+      case data["added"] do
+        # Add the player to the game lobby
+        true ->
+          IO.puts "Add the player to the game lobby"
+        # Requeue the player and try to find an another game
+        false ->
+          safe_run(
+            channel_name,
+            fn(channel) ->
+              message_headers = Map.to_list(headers)
+              AMQP.Basic.publish(channel, @exchange_requeue, @queue_requeue, payload, message_headers)
+            end
+          )
+      end
     end
 
     # TODO: Forward the message to the next stage ONLY when the group is filled
