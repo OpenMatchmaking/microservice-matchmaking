@@ -5,6 +5,8 @@
   "goldrush": {:hex, :goldrush, "0.1.9", "f06e5d5f1277da5c413e84d5a2924174182fb108dabb39d5ec548b27424cd106", [:rebar3], [], "hexpm"},
   "jsx": {:hex, :jsx, "2.8.2", "7acc7d785b5abe8a6e9adbde926a24e481f29956dd8b4df49e3e4e7bcc92a018", [:mix, :rebar3], [], "hexpm"},
   "lager": {:hex, :lager, "3.5.1", "63897a61af646c59bb928fee9756ce8bdd02d5a1a2f3551d4a5e38386c2cc071", [:rebar3], [{:goldrush, "0.1.9", [hex: :goldrush, repo: "hexpm", optional: false]}], "hexpm"},
+  "libcluster": {:hex, :libcluster, "2.3.0", "d2fb8e8b2054a4a0c7faf7ced7c41dd13f7b49cce689590d37ecf30098e1b344", [:mix], [{:poison, "~> 3.0", [hex: :poison, repo: "hexpm", optional: false]}], "hexpm"},
+  "mnesiam": {:hex, :mnesiam, "0.1.1", "cf52797450af8e3813864f3d6d5693d0dc9d979d1050821312ade5598ab54b80", [:mix], [], "hexpm"},
   "poison": {:hex, :poison, "3.1.0", "d9eb636610e096f86f25d9a46f35a9facac35609a7591b3be3326e99a0484665", [:mix], [], "hexpm"},
   "rabbit_common": {:hex, :rabbit_common, "3.7.3", "f23ed393e12150e3d3b6ef640be7bfddfefce72a65e2ce27d44249ef84287c96", [:make, :rebar3], [{:jsx, "2.8.2", [hex: :jsx, repo: "hexpm", optional: false]}, {:lager, "3.5.1", [hex: :lager, repo: "hexpm", optional: false]}, {:ranch, "1.4.0", [hex: :ranch, repo: "hexpm", optional: false]}, {:ranch_proxy_protocol, "1.4.4", [hex: :ranch_proxy_protocol, repo: "hexpm", optional: false]}, {:recon, "2.3.2", [hex: :recon, repo: "hexpm", optional: false]}], "hexpm"},
   "ranch": {:hex, :ranch, "1.4.0", "10272f95da79340fa7e8774ba7930b901713d272905d0012b06ca6d994f8826b", [:rebar3], [], "hexpm"},
