@@ -47,10 +47,22 @@ defmodule Matchmaking.Model.ActiveUser do
   def add_user(user_id) do
     data_to_write = fn -> Mnesia.write({@table, user_id, DateTime.utc_now()}) end
     case Mnesia.transaction(data_to_write) do
-      {:atomic, :ok} -> {:ok, :added}
+      {:atomic, :ok} ->
+        {:ok, :added}
       {:aborted, reason} ->
         Logger.warn "#{inspect reason}"
         {:ok, :added}
+    end
+  end
+
+  def remove_user(user_id) do
+    data_to_delete = fn -> Mnesia.delete({@table, user_id}) end
+    case Mnesia.transaction(data_to_delete) do
+      {:atomic, :ok} ->
+        {:ok, :removed}
+      {:aborted, reason} ->
+        Logger.warn "#{inspect reason}"
+        {:ok, :removed}
     end
   end
 end

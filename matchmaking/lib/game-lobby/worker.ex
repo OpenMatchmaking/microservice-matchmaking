@@ -72,6 +72,7 @@ defmodule Matchmaking.Lobby.Worker do
         })
 
         send_response(channel_name, queue_name, response)
+        Matchmaking.Model.ActiveUser.remove_user(player["id"])
         {:ok}
       end)
 
