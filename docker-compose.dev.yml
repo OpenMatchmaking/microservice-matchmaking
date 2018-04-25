@@ -30,6 +30,9 @@ services:
       - MONGODB_PASSWORD=password
       - MONGODB_HOST=mongodb
       - MONGODB_DATABASE=auth
+      - WAIT_FOR_MONGODB=30
+      - WAIT_FOR_REDIS=30
+      - WAIT_FOR_RABBITMQ=30
     ports:
       - "8000:8000"
     depends_on:
@@ -44,6 +47,7 @@ services:
     environment:
       - APP_SERVER=simplerun
       - APP_CONFIG_PATH=./config.py
+      - WAIT_FOR_RABBITMQ=30
     depends_on:
       - rabbitmq
       - microservice_auth
