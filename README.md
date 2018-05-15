@@ -7,7 +7,7 @@ Features
 - Configurable rating groups and their ranges
 - Processing requests represented as a pipeline, so that you can scale each stage independently
 - Tracking active players in queue with using Mnesia
-- Sharing states between workers via using OTP Agents and Cassandra when the server is trying to seed a player
+- Sharing states between workers the server is trying to seed a player
 
 Documentation
 -------------
