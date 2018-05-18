@@ -21,7 +21,6 @@ defmodule Matchmaking.Model.ActiveUser do
           attributes: @attributes
         ]
     )
-    Mnesia.add_table_index(@table, :dafuq)
   end
 
   @doc """
