@@ -48,6 +48,9 @@ defmodule Matchmaking.Model.LobbyState do
     end
   end
 
+  @doc """
+  Returns a random shared lobby state. If the table is empty returns `nil`.
+  """
   def get_state(table_suffix, attempt \\ 5, timeout \\ 1_000) do
     table_name = get_table_name(table_suffix)
     table_size = Mnesia.table_info(table_name, :size)
@@ -83,10 +86,10 @@ defmodule Matchmaking.Model.LobbyState do
   @doc """
   Inserts or updates a state in database by UUID.
   """
-  def update_state(table_suffix, row_id, state, attempt \\ 5, timeout \\ 1_000) do
+  def update_state(table_suffix, id, state, attempt \\ 5, timeout \\ 1_000) do
     table_name = get_table_name(table_suffix)
     state_dump = Poison.encode!(state)
-    data_to_write = fn -> Mnesia.write({table_name, row_id, state_dump}) end
+    data_to_write = fn -> Mnesia.write({table_name, id, state_dump}) end
     case Mnesia.transaction(data_to_write) do
       {:atomic, :ok} ->
         {:ok, :updated}
@@ -95,7 +98,7 @@ defmodule Matchmaking.Model.LobbyState do
         :timer.sleep(timeout)
 
         case attempt > 0 do
-          true -> update_state(table_suffix, row_id, state, attempt - 1, timeout)
+          true -> update_state(table_suffix, id, state, attempt - 1, timeout)
           false -> {:ok, :updated}
         end
     end
