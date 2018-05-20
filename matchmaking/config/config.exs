@@ -35,8 +35,13 @@ config :matchmaking, RatingGroups,
     {4000, 5000, "grandmaster"},
   ]
 
+config :mnesia, :dir, System.get_env("MNESIA_DUMP_DIRECTORY") || '/app/mnesia_disc_dump'
+
 config :mnesiam,
-  stores: [Matchmaking.Model.ActiveUser],
+  stores: [
+    Matchmaking.Model.ActiveUser,
+    Matchmaking.Model.LobbyState
+  ],
   table_load_timeout: 600_000
 
 config :libcluster,
