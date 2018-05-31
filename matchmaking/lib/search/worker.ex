@@ -2,7 +2,6 @@ defmodule Matchmaking.Search.Worker do
   @moduledoc """
   Base module for implementing workers per each rating group.
   """
-  # TODO: Save intermidiate state with the grouped players
 
   @doc """
   Create a link to worker process. Used in supervisors.
@@ -22,17 +21,17 @@ defmodule Matchmaking.Search.Worker do
   @channel_name String.to_atom("#{__MODULE__}.Channel")
 
   @default_exchange_path "open-matchmaking.matchmaking"
-  @default_exchange_type "fanout"
+  @default_exchange_type "direct"
   @default_queue_path "matchmaking.queues"
 
   @queue_options    [durable: true]
-  @exchange_options [type: :fanout, durable: true]
+  @exchange_options [type: :direct, durable: true]
   @qos_options      [prefetch_count: 10]
 
-  @exchange_forward "open-matchmaking.matchmaking.game-lobby.fanout"
+  @exchange_forward "open-matchmaking.matchmaking.game-lobby.direct"
   @queue_forward "matchmaking.queues.lobbies"
 
-  @exchange_match_check "open-matchmaking.strategist.check.fanout"
+  @exchange_match_check "open-matchmaking.strategist.check.direct"
   @queue_match_check "strategist.match.check"
 
   @exchange_requeue "open-matchmaking.matchmaking.requeue.direct"
@@ -40,7 +39,9 @@ defmodule Matchmaking.Search.Worker do
 
   @exchange_response "open-matchmaking.responses.direct"
 
+  # --------------------------------------------------
   # Client callbacks
+  # --------------------------------------------------
 
   defp generate_queue_name(suffix) do
     "#{@default_queue_path}.#{suffix}"
@@ -66,7 +67,6 @@ defmodule Matchmaking.Search.Worker do
 
   def start_link(opts) do
     config = prepare_config(opts)
-    {_, opts} = Keyword.pop(opts, :group_name)
     GenServer.start_link(__MODULE__, %{config: config, opts: opts})
   end
 
@@ -139,25 +139,9 @@ defmodule Matchmaking.Search.Worker do
     end
   end
 
-  # Server callbacks
-
-  def init(opts) do
-    {channel_name, updated_opts} = Keyword.pop(opts[:opts], :channel_name, @channel_name)
-    opts = Map.put(opts, :opts, updated_opts)
-
-    case Process.whereis(@connection) do
-      nil ->
-        # Connection doesn't exist, lets fail to recover later
-        {:error, :noconn}
-      _ ->
-        @connection.spawn_channel(channel_name)
-        @connection.configure_channel(channel_name, opts[:config])
-
-        channel = get_channel(channel_name)
-        {:ok, custom} = configure(channel_name, opts[:config])
-        {:ok, [channel: channel, channel_name: channel_name, meta: custom]}
-    end
-  end
+  # --------------------------------------------------
+  # AMQP wrappers for RPC requests to microservices
+  # --------------------------------------------------
 
   defp receive_message(channel_name, queue_name) do
     safe_run(
@@ -181,9 +165,7 @@ defmodule Matchmaking.Search.Worker do
     Poison.decode!(payload)["content"]
   end
 
-  defp consume(channel_name, tag, headers, payload) do
-    player_data = Poison.decode!(payload)
-
+  defp declare_unique_queue(channel_name, exchange_response) do
     {:ok, queue_name} = safe_run(
       channel_name,
       fn(channel) ->
@@ -194,61 +176,144 @@ defmodule Matchmaking.Search.Worker do
     :ok = safe_run(
       channel_name,
       fn(channel) ->
-        AMQP.Queue.bind(channel, queue_name, @exchange_response, routing_key: queue_name)
+        AMQP.Queue.bind(channel, queue_name, exchange_response, routing_key: queue_name)
       end
     )
+    queue_name
+  end
 
-    # Send the message to the microservice-strategist
+  def send_request_to_microservice(channel_name, queue_name, data, options \\ []) do
+    exchange_request = Keyword.get(options, :exchange_request, "")
+    queue_request = Keyword.get(options, :queue_request, "")
+
     safe_run(
       channel_name,
       fn(channel) ->
-        {game_mode, player} = Map.pop(player_data, "game-mode")
-
-        data = Poison.encode!(%{
-          "game-mode" => game_mode,
-          "new-player" => player,
-          "grouped-players" => %{}
-        })
-
         AMQP.Basic.publish(
-          channel, @exchange_match_check, @queue_match_check, data,
+          channel, exchange_request, queue_request, data,
           persistent: true,
           reply_to: queue_name,
           content_type: "application/json"
         )
       end
     )
+    :ok
+  end
 
-    # TODO: Save the player in the group when is it possible
-    data = wait_for_response(channel_name, queue_name)
-    if Matchmaking.Model.ActiveUser.in_queue?(player_data["id"]) do
-      case data["added"] do
-        # Add the player to the game lobby
-        true ->
-          IO.puts "Add the player to the game lobby"
-        # Requeue the player and try to find an another game
-        false ->
-          safe_run(
-            channel_name,
-            fn(channel) ->
-              message_headers = Map.to_list(headers)
-              AMQP.Basic.publish(channel, @exchange_requeue, @queue_requeue, payload, message_headers)
-            end
-          )
+  def send_rpc_request(channel_name, data, options \\ []) do
+    exchange_response = Keyword.get(options, :exchange_response, "")
+    exchange_request = Keyword.get(options, :exchange_request, "")
+    queue_request = Keyword.get(options, :queue_request, "")
+
+    queue_name = declare_unique_queue(channel_name, exchange_response)
+    send_request_to_microservice(
+      channel_name, queue_name, data,
+      [exchange_request: exchange_request, queue_request: queue_request]
+    )
+    wait_for_response(channel_name, queue_name)
+  end
+
+  # --------------------------------------------------
+  # Server callbacks
+  # --------------------------------------------------
+
+  def init(opts) do
+    {channel_name, updated_opts} = Keyword.pop(opts[:opts], :channel_name, @channel_name)
+    {group_name, updated_opts} = Keyword.pop(updated_opts, :group_name)
+    opts = Map.put(opts, :opts, updated_opts)
+
+    case Process.whereis(@connection) do
+      nil ->
+        # Connection doesn't exist, lets fail to recover later
+        {:error, :noconn}
+      _ ->
+        @connection.spawn_channel(channel_name)
+        @connection.configure_channel(channel_name, opts[:config])
+
+        channel = get_channel(channel_name)
+        {:ok, custom} = configure(channel_name, opts[:config])
+        {:ok, [channel: channel, channel_name: channel_name, group_name: group_name, meta: custom]}
+    end
+  end
+
+  defp requeue_player(channel_name, exchange_requeue, queue_requeue, payload, headers) do
+    :timer.sleep(1_000)
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        message_headers = Map.to_list(headers)
+        AMQP.Basic.publish(channel, exchange_requeue, queue_requeue, payload, message_headers)
       end
+    )
+  end
+
+  defp prepare_game_lobby(channel_name, exchange_forward, queue_forward, payload) do
+    safe_run(
+      channel_name,
+      fn(channel) ->
+        AMQP.Basic.publish(
+          channel, exchange_forward, queue_forward, payload,
+          persistent: true,
+          content_type: "application/json"
+        )
+      end
+    )
+  end
+
+  defp get_players_count(teams) do
+    Enum.reduce(Map.values(teams), 0, fn(players, acc) -> Enum.count(players) + acc end)
+  end
+
+  defp remove_inactive_players(teams) do
+    updated_teams = Map.new(
+      for team <- Map.keys(teams),
+      do: {team, Enum.filter(
+             teams[team],
+             fn(player) -> Matchmaking.Model.ActiveUser.in_queue?(player["id"]) end)
+          }
+    )
+
+    players_count_before = get_players_count(teams)
+    players_count_after = get_players_count(updated_teams)
+    is_changed = players_count_before != players_count_after
+    {updated_teams, is_changed}
+  end
+
+  defp save_new_state(group_name, game_mode, grouped_players) do
+    case Matchmaking.Model.LobbyState.update_state(group_name, game_mode, grouped_players) do
+      {:ok, :updated} -> {:ok, :updated}
+      {:error, :mnesia_not_responding} ->
+        Logger.warn "Occurred an error when trying to save a new game lobby state in Mnesia."
+        Matchmaking.Model.LobbyState.update_state(group_name, game_mode, grouped_players, 100, 5_000)
+    end
+  end
+
+  defp consume(channel_name, group_name, tag, headers, payload) do
+    player_data = Poison.decode!(payload)
+
+    {game_mode, player} = Map.pop(player_data, "game-mode")
+    {:ok, grouped_players} = Matchmaking.Model.LobbyState.get_state(group_name, game_mode)
+    request_data = Poison.encode!(%{
+      "game-mode" => game_mode,
+      "new-player" => player,
+      "grouped-players" => grouped_players
+    })
+    data = send_rpc_request(
+      channel_name, request_data,
+      [exchange_response: @exchange_response,
+       exchange_request: @exchange_match_check,
+       exchange_queue: @queue_match_check]
+    )
+
+    if Matchmaking.Model.ActiveUser.in_queue?(player_data["id"]) && !data["added"] do
+      requeue_player(channel_name, @exchange_requeue, @queue_requeue, payload, headers)
     end
 
-    # TODO: Forward the message to the next stage ONLY when the group is filled
-    #safe_run(
-    #  channel_name,
-    #  fn(channel) ->
-    #    AMQP.Basic.publish(
-    #      channel, @exchange_forward, @queue_forward, payload,
-    #      persistent: true,
-    #      content_type: "application/json",
-    #    )
-    #  end
-    #)
+    {updated_grouped_players, is_changed} = remove_inactive_players(data["grouped-players"])
+    case data["is_filled"] && !is_changed do
+      true -> prepare_game_lobby(channel_name, @exchange_forward, @queue_forward, updated_grouped_players)
+      false -> save_new_state(group_name, game_mode, updated_grouped_players)
+    end
 
     ack(channel_name, tag)
   end
@@ -281,8 +346,9 @@ defmodule Matchmaking.Search.Worker do
   # Notification about an incoming message
   def handle_info({:basic_deliver, payload, headers}, state) do
     channel_name = state[:channel_name]
+    group_name = state[:group_name]
     tag = Map.get(headers, :delivery_tag)
-    spawn fn -> consume(channel_name, tag, headers, payload) end
+    spawn fn -> consume(channel_name, group_name, tag, headers, payload) end
     {:noreply, state}
   end
 

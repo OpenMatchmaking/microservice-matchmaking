@@ -5,7 +5,7 @@ defmodule Matchmaking.Lobby.Worker do
   # TODO: After sending response for each player delete him from the storage with active users (because it's done)
   # TODO: Implement and integrate with the game-server microservice
 
-  @exchange_request "open-matchmaking.matchmaking.lobby.fanout"
+  @exchange_request "open-matchmaking.matchmaking.lobby.direct"
   @queue_request "matchmaking.queues.lobbies"
 
   use AMQP
@@ -18,7 +18,7 @@ defmodule Matchmaking.Lobby.Worker do
   ],
   exchange: [
     name: @exchange_request,
-    type: :fanout,
+    type: :direct,
     durable: true,
     passive: true
   ],

@@ -23,7 +23,7 @@ defmodule Matchmaking.Requeue.Worker do
     prefetch_count: 10
   ]
 
-  @exchange_forward "open-matchmaking.matchmaking.generic-queue.fanout"
+  @exchange_forward "open-matchmaking.matchmaking.generic-queue.direct"
   @queue_forward "matchmaking.queues.generic"
 
   def configure(channel_name, _opts) do

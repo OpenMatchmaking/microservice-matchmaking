@@ -2,7 +2,7 @@ defmodule Matchmaking.Generic.Worker do
   @moduledoc """
   Worker that sending incoming messages to the certain queue for processing.
   """
-  @exchange_request "open-matchmaking.matchmaking.generic-queue.fanout"
+  @exchange_request "open-matchmaking.matchmaking.generic-queue.direct"
   @queue_request "matchmaking.queues.generic"
 
   use AMQP
@@ -15,7 +15,7 @@ defmodule Matchmaking.Generic.Worker do
   ],
   exchange: [
     name: @exchange_request,
-    type: :fanout,
+    type: :direct,
     durable: true,
     passive: true
   ],
@@ -28,7 +28,7 @@ defmodule Matchmaking.Generic.Worker do
 
   @default_queue_path "matchmaking.queues"
   @default_exchange_path "open-matchmaking.matchmaking"
-  @default_exchange_type "fanout"
+  @default_exchange_type "direct"
 
   def configure(channel_name, _opts) do
     consumer = create_consumer(channel_name, @queue_request)
