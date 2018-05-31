@@ -25,7 +25,7 @@ defmodule Matchmaking.Middleware.Worker do
 
   @exchange_response "open-matchmaking.responses.direct"
 
-  @exchange_forward "open-matchmaking.matchmaking.generic-queue.fanout"
+  @exchange_forward "open-matchmaking.matchmaking.generic-queue.direct"
   @queue_forward "matchmaking.queues.generic"
 
   @router Spotter.Router.new([
