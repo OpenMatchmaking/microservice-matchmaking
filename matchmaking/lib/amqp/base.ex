@@ -5,6 +5,7 @@ defmodule Matchmaking.AMQP.Worker do
   @doc false
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
+      use AMQP
       use Spotter.Worker,
       otp_app: :matchmaking,
       connection: Matchmaking.AMQP.Connection,
@@ -48,6 +49,78 @@ defmodule Matchmaking.AMQP.Worker do
       """
       def nack(channel_name, tag) do
         safe_run(channel_name, fn(channel) -> AMQP.Basic.nack(channel, tag) end)
+      end
+
+      # AMQP wrappers for communicating with microservices
+
+      defp receive_message(channel_name, queue_name) do
+        safe_run(
+          channel_name,
+          fn(channel) ->
+            case AMQP.Basic.get(channel, queue_name) do
+              {:ok, message, meta} ->
+                {message, meta}
+              {:empty, _} ->
+                :timer.sleep(1000)
+                receive_message(channel_name, queue_name)
+            end
+          end
+        )
+      end
+
+      defp wait_for_response(channel_name, queue_name) do
+        {payload, meta} = receive_message(channel_name, queue_name)
+        ack(channel_name, meta.delivery_tag)
+        safe_run(channel_name, fn(channel) -> AMQP.Queue.delete(channel, queue_name) end)
+        Poison.decode!(payload)
+      end
+
+      defp declare_unique_queue(channel_name, exchange_response) do
+        {:ok, queue_name} = safe_run(
+          channel_name,
+          fn(channel) ->
+             {:ok, response_queue} = AMQP.Queue.declare(channel, "", durable: true, exclusive: true)
+             {:ok, response_queue.queue}
+          end
+        )
+        :ok = safe_run(
+          channel_name,
+          fn(channel) ->
+            AMQP.Queue.bind(channel, queue_name, exchange_response, routing_key: queue_name)
+          end
+        )
+        queue_name
+      end
+
+      def send_request_to_microservice(channel_name, queue_name, data, options \\ []) do
+        exchange_request = Keyword.get(options, :exchange_request, "")
+        queue_request = Keyword.get(options, :queue_request, "")
+
+        safe_run(
+          channel_name,
+          fn(channel) ->
+            AMQP.Basic.publish(
+              channel, exchange_request, queue_request, data,
+              persistent: true,
+              reply_to: queue_name,
+              content_type: "application/json"
+            )
+          end
+        )
+        :ok
+      end
+
+      def send_rpc_request(channel_name, data, options \\ []) do
+        exchange_response = Keyword.get(options, :exchange_response, "")
+        exchange_request = Keyword.get(options, :exchange_request, "")
+        queue_request = Keyword.get(options, :queue_request, "")
+
+        queue_name = declare_unique_queue(channel_name, exchange_response)
+        send_request_to_microservice(
+          channel_name, queue_name, data,
+          [exchange_request: exchange_request, queue_request: queue_request]
+        )
+        wait_for_response(channel_name, queue_name)
       end
 
       # Server callbacks
