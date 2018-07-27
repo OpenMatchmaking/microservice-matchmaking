@@ -1,8 +1,12 @@
-version: "2"
+version: "3"
 
 networks:
   app-tier:
     driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
 
 services:
 
@@ -18,13 +22,15 @@ services:
     volumes:
       - ./matchmaking:/app/
     depends_on:
+      - microservice_auth
+      - microservice_player_stats
       - microservice_strategist
     networks:
       - app-tier
     tty: true
 
   microservice_auth:
-    image: openmatchmaking/microservice-auth:0.1.1
+    image: openmatchmaking/microservice-auth:0.1.3
     environment:
       - APP_HOST=0.0.0.0
       - APP_SERVER=sanic
@@ -33,13 +39,14 @@ services:
       - MONGODB_USERNAME=user
       - MONGODB_PASSWORD=password
       - MONGODB_HOST=mongodb
-      - MONGODB_DATABASE=auth
+      - MONGODB_DATABASE=microservices_db
       - WAIT_FOR_MONGODB=30
       - WAIT_FOR_REDIS=30
       - WAIT_FOR_RABBITMQ=30
     ports:
-      - "8000:8000"
+      - 8000:8000
     depends_on:
+      - rabbitmq
       - mongodb
       - redis
     networks:
@@ -47,11 +54,14 @@ services:
     tty: true
 
   microservice_strategist:
-    image: openmatchmaking/microservice-strategist:0.2.0
+    image: openmatchmaking/microservice-strategist:0.2.3
     environment:
       - APP_SERVER=simplerun
       - APP_CONFIG_PATH=./config.py
+      - SERVICE_HOST=microservice_auth
+      - SERVICE_PORT=8000
       - WAIT_FOR_RABBITMQ=30
+      - WAIT_FOR_SERVICE=30
     depends_on:
       - rabbitmq
       - microservice_auth
@@ -59,8 +69,30 @@ services:
       - app-tier
     tty: true
 
+  microservice_player_stats:
+    image: openmatchmaking/microservice-player-statistics:0.1.0
+    environment:
+      - APP_SERVER=sanic
+      - APP_CONFIG_PATH=./config.py
+      - MONGODB_USERNAME=user
+      - MONGODB_PASSWORD=password
+      - MONGODB_HOST=mongodb
+      - MONGODB_DATABASE=microservices_db
+      - SERVICE_HOST=microservice_auth
+      - SERVICE_PORT=8000
+      - WAIT_FOR_MONGODB=30
+      - WAIT_FOR_RABBITMQ=30
+      - WAIT_FOR_SERVICE=30
+    depends_on:
+      - rabbitmq
+      - mongodb
+      - microservice_auth
+    networks:
+      - app-tier
+    tty: true
+
   rabbitmq:
-    image: "bitnami/rabbitmq:latest"
+    image: bitnami/rabbitmq:3.7
     ports:
       - 5672:5672
       - 15672:15672
@@ -69,25 +101,30 @@ services:
       - RABBITMQ_PASSWORD=password
     networks:
       - app-tier
+    tty: true
 
   mongodb:
-    image: bitnami/mongodb:3.7
+    image: bitnami/mongodb:4
     ports:
-      - "27017:27017"
+      - 27017:27017
     environment:
       - MONGODB_USERNAME=user
       - MONGODB_PASSWORD=password
-      - MONGODB_DATABASE=auth
+      - MONGODB_DATABASE=microservices_db
       - MONGODB_ROOT_PASSWORD=root
+    volumes:
+      - mongodb_data:/bitnami
     networks:
       - app-tier
+    tty: true
 
   redis:
     image: bitnami/redis:latest
     ports:
-      - "6379:6379"
+      - 6379:6379
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_EXTRA_FLAGS=--maxmemory 100mb
     networks:
       - app-tier
+    tty: true
