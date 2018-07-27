@@ -1,9 +1,10 @@
 defmodule Matchmaking.Middleware.Worker do
   @moduledoc false
-  # TODO: Extract data about the player from the external microservice and provide
 
   @exchange_request "open-matchmaking.direct"
   @queue_request "matchmaking.games.search"
+
+  require Logger
 
   use AMQP
   use Matchmaking.AMQP.Worker.Consumer,
@@ -24,6 +25,9 @@ defmodule Matchmaking.Middleware.Worker do
   ]
 
   @exchange_response "open-matchmaking.responses.direct"
+
+  @exchange_player_stats "open-matchmaking.player-stats.statistic.retrieve.direct"
+  @queue_player_stats "player-stats.statistic.retrieve"
 
   @exchange_forward "open-matchmaking.matchmaking.generic-queue.direct"
   @queue_forward "matchmaking.queues.generic"
@@ -54,7 +58,7 @@ defmodule Matchmaking.Middleware.Worker do
   defp check_permissions(endpoint, permissions) do 
     case endpoint.__struct__.has_permissions(endpoint, permissions) do
       true -> {:ok, nil}
-      false -> {:error, "The user does not have the necessary permissions for a resource."}
+      false -> {:error, "The user doesn't have the required permissions for a resource."}
     end
   end
 
@@ -62,6 +66,23 @@ defmodule Matchmaking.Middleware.Worker do
     case Matchmaking.Model.ActiveUser.in_queue?(user_id) do
       false -> Matchmaking.Model.ActiveUser.add_user(user_id)
       true -> {:error, "You are already in the queue."}
+    end
+  end
+
+  defp get_player_statistics(channel_name, user_id) do
+    request_data = Poison.encode!(%{"player_id" => user_id})
+    response = send_rpc_request(
+      channel_name, request_data,
+      [exchange_response: @exchange_response,
+       exchange_request: @exchange_player_stats,
+       queue_request: @queue_player_stats]
+    )
+
+    case Map.has_key?(response, "content") do
+      true -> {:ok, response["content"]}
+      false ->
+        Logger.warn "Received an error from player-statistics microservice: #{inspect response["error"]}. Request data: #{inspect request_data}."
+        {:error, "An error occurred while getting a player statistics."}
     end
   end
 
@@ -81,9 +102,9 @@ defmodule Matchmaking.Middleware.Worker do
     )
   end
 
-  def send_response(channel_name, queue_name, error_description, headers) do
+  def send_response(channel_name, queue_name, errors, headers) do
     response = Poison.encode!(%{
-      "errors" => [%{"Validation error" => error_description}],
+      "errors" => errors,
       "event-name": Map.get(headers, :correlation_id, "null"),
     })
     safe_run(
@@ -106,12 +127,23 @@ defmodule Matchmaking.Middleware.Worker do
     permissions = String.split(raw_permissions, ";", trim: true)
     user_id = Map.get(extra_headers, "user_id")
     reply_to = Map.get(headers, :reply_to)
+    event_name = Map.get(headers, :correlation_id)
 
     with {:ok, endpoint} <- get_endpoint(resource_path),
          {:ok, nil} <- check_permissions(endpoint, permissions),
-         {:ok, :added} <- add_user_to_queue(user_id)
+         {:ok, :added} <- add_user_to_queue(user_id),
+         {:ok, player_data} <- get_player_statistics(channel_name, user_id)
     do
-      send_request(channel_name, payload, reply_to, headers, extra_headers)
+      request_data = Poison.decode!(payload)
+        |> Map.merge(%{
+              "id" => user_id,
+              "reply_to" => reply_to,
+              "event-name" => event_name,
+              "detail" => player_data
+           })
+        |> Poison.encode!
+
+      send_request(channel_name, player_data, reply_to, headers, extra_headers)
     else
       {:error, reason} -> send_response(channel_name, reply_to, reason, headers)
     end
