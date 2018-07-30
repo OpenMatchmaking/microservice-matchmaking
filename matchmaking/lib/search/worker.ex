@@ -311,7 +311,12 @@ defmodule Matchmaking.Search.Worker do
 
     {updated_grouped_players, is_changed} = remove_inactive_players(data["grouped-players"])
     case data["is_filled"] && !is_changed do
-      true -> prepare_game_lobby(channel_name, @exchange_forward, @queue_forward, updated_grouped_players)
+      true ->
+        game_lobby_data = Poison.encode!(%{
+          "teams" => updated_grouped_players,
+          "game-mode" => game_mode
+        })
+        prepare_game_lobby(channel_name, @exchange_forward, @queue_forward, game_lobby_data)
       false -> save_new_state(group_name, game_mode, updated_grouped_players)
     end
 
