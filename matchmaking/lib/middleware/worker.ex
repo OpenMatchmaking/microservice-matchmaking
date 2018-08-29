@@ -143,7 +143,7 @@ defmodule Matchmaking.Middleware.Worker do
            })
         |> Poison.encode!
 
-      send_request(channel_name, player_data, reply_to, headers, extra_headers)
+      send_request(channel_name, request_data, reply_to, headers, extra_headers)
     else
       {:error, reason} -> send_response(channel_name, reply_to, reason, headers)
     end
