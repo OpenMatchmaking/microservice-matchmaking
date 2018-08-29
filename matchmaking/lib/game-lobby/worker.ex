@@ -48,7 +48,7 @@ defmodule Matchmaking.Lobby.Worker do
     )
   end
 
-  def prepare_response(player, server_credentials) do
+  def prepare_response(team, player, server_credentials) do
     Poison.encode!(%{
       "content" => %{
         "ip" => server_credentials["ip"],
@@ -74,7 +74,7 @@ defmodule Matchmaking.Lobby.Worker do
     Enum.map(grouped_players, fn({team, players}) ->
       Enum.map(players, fn(player) ->
         queue_name = player["response-queue"]
-        response = prepare_response(player, server_credentials)
+        response = prepare_response(team, player, server_credentials)
 
         send_response(channel_name, queue_name, response)
         Matchmaking.Model.ActiveUser.remove_user(player["id"])
