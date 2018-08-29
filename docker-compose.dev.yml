@@ -21,6 +21,7 @@ services:
       - SPOTTER_AMQP_HOST=rabbitmq
     volumes:
       - ./matchmaking:/app/
+      - ./Makefile:/app/Makefile
     depends_on:
       - microservice_auth
       - microservice_player_stats
