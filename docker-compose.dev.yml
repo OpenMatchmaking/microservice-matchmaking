@@ -19,6 +19,7 @@ services:
       - SPOTTER_AMQP_USERNAME=user
       - SPOTTER_AMQP_PASSWORD=password
       - SPOTTER_AMQP_HOST=rabbitmq
+      - SPOTTER_AMQP_VHOST=vhost
     volumes:
       - ./matchmaking:/app/
       - ./Makefile:/app/Makefile
