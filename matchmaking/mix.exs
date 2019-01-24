@@ -25,7 +25,7 @@ defmodule Middleware.MixProject do
       {:spotter, "~> 0.4.1"},
       {:poison, "~> 3.1"},
       {:mnesiam, "~> 0.1.1"},
-      {:libcluster, "~> 2.1"},
+      {:libcluster, "~> 3.0"},
       {:uuid, "~> 1.1" }
     ]
   end
