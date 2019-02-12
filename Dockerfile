@@ -1,4 +1,4 @@
-FROM elixir:1.6.2
+FROM elixir:1.8.1
 
 COPY matchmaking /app
 WORKDIR /app
