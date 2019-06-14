@@ -52,6 +52,8 @@ defmodule Matchmaking.Application do
       spawn_search_workers(Matchmaking.Search.Worker, @config[:search_queue_workers]),
     ])
 
+    IO.puts "#{inspect children}}"
+
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]
     Supervisor.start_link(children, opts)
   end

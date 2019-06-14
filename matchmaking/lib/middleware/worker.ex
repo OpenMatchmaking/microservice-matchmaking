@@ -48,28 +48,28 @@ defmodule Matchmaking.Middleware.Worker do
     {:ok, [consumer: consumer]}
   end
 
-  defp get_endpoint(path) do
+  def get_endpoint(path) do
     case Spotter.Router.dispatch(@router, path) do
       endpoint when endpoint != nil -> {:ok, endpoint}
       nil -> {:error, "The requested resource does not exist."}
     end
   end
 
-  defp check_permissions(endpoint, permissions) do 
+  def check_permissions(endpoint, permissions) do
     case endpoint.__struct__.has_permissions(endpoint, permissions) do
       true -> {:ok, nil}
       false -> {:error, "The user doesn't have the required permissions for a resource."}
     end
   end
 
-  defp add_user_to_queue(user_id) do
+  def add_user_to_queue(user_id) do
     case Matchmaking.Model.ActiveUser.in_queue?(user_id) do
       false -> Matchmaking.Model.ActiveUser.add_user(user_id)
       true -> {:error, "You are already in the queue."}
     end
   end
 
-  defp get_player_statistics(channel_name, user_id) do
+  def get_player_statistics(channel_name, user_id) do
     request_data = Poison.encode!(%{"player_id" => user_id})
     response = send_rpc_request(
       channel_name, request_data,
