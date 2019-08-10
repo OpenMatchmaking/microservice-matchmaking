@@ -120,13 +120,13 @@ defmodule Matchmaking.Middleware.Worker do
   end
 
   def consume(channel_name, tag, headers, payload) do
-    extra_headers = Map.get(headers, :headers, [])
+    extra_headers = Map.get(headers, :headers, []) || []
     extra_headers = Enum.into(Enum.map(extra_headers, fn({key, _, value}) -> {key, value} end), %{})
-    resource_path = Map.get(extra_headers, "microservice_name")
-    raw_permissions = Map.get(extra_headers, "permissions", "")
+    resource_path = Map.get(extra_headers, "om_microservice_name")
+    raw_permissions = Map.get(extra_headers, "om_permissions", "")
     permissions = String.split(raw_permissions, ";", trim: true)
-    user_id = Map.get(extra_headers, "user_id")
-    reply_to = Map.get(headers, :reply_to)
+    user_id = Map.get(extra_headers, "om_user_id")
+    reply_to = Map.get(headers, :reply_to, nil) || ""
     event_name = Map.get(headers, :correlation_id)
 
     with {:ok, endpoint} <- get_endpoint(resource_path),
