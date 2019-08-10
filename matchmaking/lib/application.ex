@@ -40,21 +40,27 @@ defmodule Matchmaking.Application do
   end
 
   def start(_type, _args) do
-    children = List.flatten([
+    default_processes = [
       # Start the AMQP connection
       get_child_spec(Matchmaking.AMQP.Connection, []),
+    ]
 
+    workers = [
       # Start the middleware and workers
       spawn_workers(Matchmaking.Middleware.Worker, @config[:middleware_workers]),
       spawn_workers(Matchmaking.Generic.Worker, @config[:generic_queue_workers]),
       spawn_workers(Matchmaking.Requeue.Worker, @config[:requeue_workers]),
       spawn_workers(Matchmaking.Lobby.Worker, @config[:game_lobby_workers]),
       spawn_search_workers(Matchmaking.Search.Worker, @config[:search_queue_workers]),
-    ])
+    ]
 
-    IO.puts "#{inspect children}}"
+    child_processes = case Mix.env do
+      :test -> default_processes
+      _ -> default_processes ++ workers
+    end
 
+    IO.puts "#{inspect(default_processes)}"
     opts = [strategy: :one_for_one, name: Matchmaking.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(List.flatten(child_processes), opts)
   end
 end
