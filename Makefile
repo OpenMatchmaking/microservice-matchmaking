@@ -5,4 +5,4 @@ rebuild:
 	mix clean && mix compile
 
 tests:
-	mix test --no-start
+	mix test
