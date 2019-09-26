@@ -41,6 +41,9 @@ defmodule Matchmaking.Application do
 
   def start(_type, _args) do
     children = List.flatten([
+      # API
+      Plug.Cowboy.child_spec(scheme: :http, plug: Matchmaking.Api.Router, options: [port: 80]),
+
       # Start the AMQP connection
       get_child_spec(Matchmaking.AMQP.Connection, []),
 
